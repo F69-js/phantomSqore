@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>phantomSqore Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #fafafa; margin: 0; padding: 20px; }
+        #preview { width: 100%; max-width: 400px; border: 2px solid #111; border-radius: 12px; }
+        #status { margin: 15px; font-weight: bold; color: #555; }
+        /* 展開されるアプリの受け皿（初期状態は空っぽ） */
+        #sqore-root { margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+    <canvas id="preview"></canvas>
+    <div id="status">Initializing phantomSqore...</div>
+
+    <div id="sqore-root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// ==========================================
+// 1. 汎用Web Worker（パズル結合 ＆ コマンド生成）
+// ==========================================
+const workerCode = `
+    const pages = [];
+
+    self.onmessage = function(e) {
+        const rawText = e.data;
+        
+        try {
+            // パケット分解 [Head1]/[Head2]/[Body]
+            const parts = rawText.split('/');
+            if (parts.length < 3) return;
+
+            const head1 = parts[0].split(','); // [総文字数, Pass前]
+            const head2 = parts[1].split(','); // [現在ページ, 総ページ, Pass後]
+            const body  = parts.slice(2).join('/'); // 本体のデータ
+
+            const pageNum = parseInt(head2[0]);
+            const totalPages = parseInt(head2[1]);
+
+            // パズルのピースを格納
+            pages[pageNum] = body;
+
+            // 読み込み進捗を通知
+            self.postMessage({
+                type: "loading",
+                data: { current: pages.filter(Boolean).length, total: totalPages }
+            });
+
+            // すべてのピースが揃ったら、メインにレンダリング命令を投げる
+            if (pages.filter(Boolean).length === totalPages) {
+                const fullPayload = pages.join('');
+
+                // 汎用アクション: #sqore-root の中身を丸ごと書き換える
+                self.postMessage({
+                    type: "render",
+                    data: { selector: "#sqore-root", action: "html", val: fullPayload }
+                });
+            }
+        } catch (err) {
+            self.postMessage({ type: "error", data: { message: "Packet parsing failed" } });
+        }
+    };
+`;
+
+const blob = new Blob([workerCode], { type: 'application/javascript' });
+const cultureWorker = new Worker(URL.createObjectURL(blob));
+
+// ==========================================
+// 2. 抽象化された「最強のswitch」レシーバー
+// ==========================================
+cultureWorker.onmessage = function(e) {
+    const { type, data } = e.data;
+    const statusElem = document.getElementById("status");
+
+    switch (type) {
+        case "render":
+            const targetElem = document.querySelector(data.selector);
+            if (!targetElem) return;
+
+            // アクションに応じた動的処理
+            if (data.action === "html") {
+                // 丸ごとHTMLを流し込む（天才の1行を拡張した安全なインジェクション）
+                targetElem.innerHTML = data.val;
+            } else {
+                // 属性やテキストの書き換え（例の「天才の1行」）
+                targetElem[data.action] = data.val; 
+            }
+            statusElem.textContent = "Application Hydrated Successfully.";
+            statusElem.style.color = "green";
+            break;
+
+        case "loading":
+            statusElem.textContent = `Scanning: ${data.current} / ${data.total} packets loaded.`;
+            statusElem.style.color = "#0066cc";
+            break;
+
+        case "error":
+            statusElem.textContent = "Error: " + data.message;
+            statusElem.style.color = "#ff3333";
+            break;
+    }
+};
+
+// ==========================================
+// 3. jsQR スキャンエンジン
+// ==========================================
+const video = document.getElementById("video");
+const canvas = document.getElementById("preview");
+const ctx = canvas.getContext("2d");
+let lastReadCode = "";
+
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
+    video.srcObject = stream;
+    video.setAttribute("playsinline", true);
+    video.play();
+    requestAnimationFrame(tick);
+}).catch(err => {
+    // 背面カメラがない場合は標準カメラ
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+        video.play();
+        requestAnimationFrame(tick);
+    });
+});
+
+function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+        if (code && code.data !== lastReadCode) {
+            lastReadCode = code.data;
+            cultureWorker.postMessage(code.data);
+        }
+    }
+    requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
