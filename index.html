@@ -38,7 +38,6 @@
             color: var(--accent-color);
             letter-spacing: 1px;
         }
-        /* カメラ映像と描画用キャンバスを重ねるためのコンテナ */
         #canvas-wrapper {
             position: relative;
             width: 100%;
@@ -59,7 +58,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* 下のビデオ要素の邪魔をしない */
+            pointer-events: none;
         }
         #status-card {
             background-color: #1e293b;
@@ -81,7 +80,7 @@
             border-radius: 12px;
             margin-top: 10px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            display: none; /* 初期状態は非表示 */
+            display: none;
         }
     </style>
 </head>
@@ -106,28 +105,41 @@
 </div>
 
 <script>
-// --- [1] Web Workerのインライン定義 (データ管理用) ---
+// --- [1] Web Workerのインライン定義 (スラッシュ混じりデータ対応版) ---
 const workerCode = `
     const database = new Map();
 
     self.onmessage = function(e) {
         const rawText = e.data;
         
-        // 簡易パケットバリデーション (正規表現)
-        const match = rawText.match(/^(\\d+),(\\d+)\\/(\\d+),([^/]+)\\/([^/]+)\\/(.*)$/s);
-        if (!match) return;
+        // 最初の4つのスラッシュだけを厳密に切り分けるロジックに修正
+        // フォーマット: 総文字数,現在/総数,ID,タイプ/中身
+        const firstParts = rawText.split("/", 4);
+        if (firstParts.length < 4) return;
 
-        const [_, totalLen, current, total, id, type, payload] = match;
+        // 残りの部分（5つ目以降のスラッシュを含む全ペイロード）を取得
+        const headerLength = firstParts.join("/").length + 1;
+        const payload = rawText.substring(headerLength);
+
+        const meta = firstParts[1].split("/");
+        const [current, total] = firstParts[1].split(","); // 1/2の部分を分解
+        const id = firstParts[2];
+        const type = firstParts[3];
+
+        const currentIdx = Number(current);
+        const totalIdx = Number(total);
+
+        if (isNaN(currentIdx) || isNaN(totalIdx)) return;
         
         if (!database.has(id)) {
-            database.set(id, new Array(Number(total)).fill(null));
+            database.set(id, new Array(totalIdx).fill(null));
         }
         
         const packets = database.get(id);
-        packets[Number(current) - 1] = payload;
+        packets[currentIdx - 1] = payload;
 
         const loadedCount = packets.filter(p => p !== null).length;
-        const isComplete = loadedCount === Number(total);
+        const isComplete = loadedCount === totalIdx;
 
         if (isComplete) {
             const fullPayload = packets.join("");
@@ -142,7 +154,7 @@ const workerCode = `
                 status: "progress",
                 id: id,
                 loaded: loadedCount,
-                total: total
+                total: totalIdx
             });
         }
     };
@@ -151,7 +163,7 @@ const workerCode = `
 const blob = new Blob([workerCode], { type: "application/javascript" });
 const worker = new Worker(URL.createObjectURL(blob));
 
-// --- [2] メインスレッドの処理 (UI・カメラ・描画) ---
+// --- [2] メインスレッドの処理 ---
 const video = document.getElementById("preview");
 const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
@@ -159,27 +171,26 @@ const statusText = document.getElementById("status-text");
 const appRoot = document.getElementById("app-root");
 
 let activeScan = true;
+let lastScannedData = ""; // 同じQRを連続でWorkerに送らないためのキャッシュ
+let clearFrameTimeout = null;
 
-// Web Workerからの結果を処理
 worker.onmessage = function(e) {
     const res = e.data;
     if (res.status === "progress") {
-        statusText.innerText = \`Scanning... [ID: \${res.id}] (\${res.loaded} / \${res.total} packets loaded)\`;
+        statusText.style.color = "#38bdf8";
+        statusText.innerText = `Scanning... [ID: ${res.id}] (${res.loaded} / ${res.total} packets loaded)`;
     } else if (res.status === "complete") {
-        activeScan = false; // 読み込み完了したら一旦スキャン停止
+        activeScan = false;
         statusText.style.color = "#4ade80";
-        statusText.innerText = "Application Hydrated Successfully.\\nRendering standard view...";
+        statusText.innerText = "Application Hydrated Successfully.\nRendering standard view...";
         
-        // 復元されたHTMLを注入して表示
         appRoot.innerHTML = res.data;
         appRoot.style.display = "block";
         
-        // 完了したらオーバーレイの枠をクリア
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 };
 
-// カメラの起動
 navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
         video.srcObject = stream;
@@ -190,24 +201,20 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
         statusText.innerText = "Camera Error: " + err.message;
     });
 
-// QRコードの枠を描画する関数
 function drawLine(begin, end, color) {
     ctx.beginPath();
     ctx.moveTo(begin.x, begin.y);
     ctx.lineTo(end.x, end.y);
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 6; // 少し太くして見やすく
     ctx.strokeStyle = color;
     ctx.stroke();
 }
 
-// 毎フレームの認識・描画ループ
 function tick() {
     if (video.readyState === video.HAVE_ENOUGH_DATA && activeScan) {
-        // キャンバスのサイズをビデオの実際の解像度に合わせる
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // 一時的に非表示のキャンバスにビデオフレームを描写して画素データを取得
         const hiddenCanvas = document.createElement("canvas");
         hiddenCanvas.width = canvas.width;
         hiddenCanvas.height = canvas.height;
@@ -216,26 +223,32 @@ function tick() {
         
         const imageData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
         
-        // jsQRで解析
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
             inversionAttempts: "dontInvert",
         });
 
-        // 画面上の古い枠を一回消去
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         if (code) {
-            // QRコードが見つかったら緑色の枠を描画！
+            // 緑色の枠線を描画
             const loc = code.location;
-            const strokeColor = "#4ade80"; // サイバーグリーン
+            const strokeColor = "#4ade80";
             
             drawLine(loc.topLeftCorner, loc.topRightCorner, strokeColor);
             drawLine(loc.topRightCorner, loc.bottomRightCorner, strokeColor);
             drawLine(loc.bottomRightCorner, loc.bottomLeftCorner, strokeColor);
             drawLine(loc.bottomLeftCorner, loc.topLeftCorner, strokeColor);
 
-            // Web Workerにデータを送信
-            worker.postMessage(code.data);
+            // 新しいQRコードを検知した場合のみWorkerに送信
+            if (lastScannedData !== code.data) {
+                lastScannedData = code.data;
+                worker.postMessage(code.data);
+            }
+
+            // 枠線が消えるタイマーをクリア
+            if (clearFrameTimeout) clearTimeout(clearFrameTimeout);
+            clearFrameTimeout = setTimeout(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                lastScannedData = ""; // カメラから外れたらキャッシュもリセット
+            }, 300);
         }
     }
     requestAnimationFrame(tick);
