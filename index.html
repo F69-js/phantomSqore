@@ -105,26 +105,27 @@
 </div>
 
 <script>
-// --- [1] Web Workerのインライン定義 (スラッシュ混じりデータ対応版) ---
+// --- [1] Web Workerのインライン定義 (パケットインデックス解析修正版) ---
 const workerCode = `
     const database = new Map();
 
     self.onmessage = function(e) {
         const rawText = e.data;
         
-        // 最初の4つのスラッシュだけを厳密に切り分けるロジックに修正
-        // フォーマット: 総文字数,現在/総数,ID,タイプ/中身
+        // 最初の4つのスラッシュでヘッダーを分解
+        // 例: "63/1/2/abc/text/..." みたいな形式に対応
         const firstParts = rawText.split("/", 4);
         if (firstParts.length < 4) return;
 
-        // 残りの部分（5つ目以降のスラッシュを含む全ペイロード）を取得
+        // ペイロード（データ本体）の切り出し
         const headerLength = firstParts.join("/").length + 1;
         const payload = rawText.substring(headerLength);
 
-        const meta = firstParts[1].split("/");
-        const [current, total] = firstParts[1].split(","); // 1/2の部分を分解
-        const id = firstParts[2];
-        const type = firstParts[3];
+        // 各種メタデータの抽出
+        const totalLen = firstParts[0]; // 総文字数
+        const current = firstParts[1];  // 現在のパケット番号 (1 や 2)
+        const total = firstParts[2];    // 総パケット数 (2)
+        const id = firstParts[3];       // プロジェクトID (abc)
 
         const currentIdx = Number(current);
         const totalIdx = Number(total);
@@ -146,7 +147,6 @@ const workerCode = `
             self.postMessage({
                 status: "complete",
                 id: id,
-                type: type,
                 data: fullPayload
             });
         } else {
@@ -171,7 +171,7 @@ const statusText = document.getElementById("status-text");
 const appRoot = document.getElementById("app-root");
 
 let activeScan = true;
-let lastScannedData = ""; // 同じQRを連続でWorkerに送らないためのキャッシュ
+let lastScannedData = ""; 
 let clearFrameTimeout = null;
 
 worker.onmessage = function(e) {
@@ -205,7 +205,7 @@ function drawLine(begin, end, color) {
     ctx.beginPath();
     ctx.moveTo(begin.x, begin.y);
     ctx.lineTo(end.x, end.y);
-    ctx.lineWidth = 6; // 少し太くして見やすく
+    ctx.lineWidth = 6; 
     ctx.strokeStyle = color;
     ctx.stroke();
 }
@@ -228,7 +228,6 @@ function tick() {
         });
 
         if (code) {
-            // 緑色の枠線を描画
             const loc = code.location;
             const strokeColor = "#4ade80";
             
@@ -237,17 +236,15 @@ function tick() {
             drawLine(loc.bottomRightCorner, loc.bottomLeftCorner, strokeColor);
             drawLine(loc.bottomLeftCorner, loc.topLeftCorner, strokeColor);
 
-            // 新しいQRコードを検知した場合のみWorkerに送信
             if (lastScannedData !== code.data) {
                 lastScannedData = code.data;
                 worker.postMessage(code.data);
             }
 
-            // 枠線が消えるタイマーをクリア
             if (clearFrameTimeout) clearTimeout(clearFrameTimeout);
             clearFrameTimeout = setTimeout(() => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                lastScannedData = ""; // カメラから外れたらキャッシュもリセット
+                lastScannedData = ""; 
             }, 300);
         }
     }
