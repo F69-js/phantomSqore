@@ -2,149 +2,245 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>phantomSqore Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>phantomSqore - Universal Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #fafafa; margin: 0; padding: 20px; }
-        #preview { width: 100%; max-width: 400px; border: 2px solid #111; border-radius: 12px; }
-        #status { margin: 15px; font-weight: bold; color: #555; }
-        /* 展開されるアプリの受け皿（初期状態は空っぽ） */
-        #sqore-root { margin-top: 20px; }
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --success-color: #4ade80;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .header {
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--accent-color);
+            letter-spacing: 1px;
+        }
+        /* カメラ映像と描画用キャンバスを重ねるためのコンテナ */
+        #canvas-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            background: #000;
+        }
+        #preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* 下のビデオ要素の邪魔をしない */
+        }
+        #status-card {
+            background-color: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-color);
+        }
+        #status-text {
+            margin: 0;
+            font-size: 0.9rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        #app-root {
+            width: 100%;
+            background-color: #ffffff;
+            color: #000000;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: none; /* 初期状態は非表示 */
+        }
     </style>
 </head>
 <body>
 
-    <video id="video" autoplay playsinline style="display:none;"></video>
-    <canvas id="preview"></canvas>
-    <div id="status">Initializing phantomSqore...</div>
+<div id="container">
+    <div class="header">
+        <h1>👻 phantomSqore</h1>
+        <small>Universal Distributed Engine</small>
+    </div>
 
-    <div id="sqore-root"></div>
+    <div id="canvas-wrapper">
+        <video id="preview" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+    </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <div id="status-card">
+        <p id="status-text">Initializing Camera...</p>
+    </div>
+
+    <div id="app-root"></div>
+</div>
+
 <script>
-// ==========================================
-// 1. 汎用Web Worker（パズル結合 ＆ コマンド生成）
-// ==========================================
+// --- [1] Web Workerのインライン定義 (データ管理用) ---
 const workerCode = `
-    const pages = [];
+    const database = new Map();
 
     self.onmessage = function(e) {
         const rawText = e.data;
         
-        try {
-            // パケット分解 [Head1]/[Head2]/[Body]
-            const parts = rawText.split('/');
-            if (parts.length < 3) return;
+        // 簡易パケットバリデーション (正規表現)
+        const match = rawText.match(/^(\\d+),(\\d+)\\/(\\d+),([^/]+)\\/([^/]+)\\/(.*)$/s);
+        if (!match) return;
 
-            const head1 = parts[0].split(','); // [総文字数, Pass前]
-            const head2 = parts[1].split(','); // [現在ページ, 総ページ, Pass後]
-            const body  = parts.slice(2).join('/'); // 本体のデータ
+        const [_, totalLen, current, total, id, type, payload] = match;
+        
+        if (!database.has(id)) {
+            database.set(id, new Array(Number(total)).fill(null));
+        }
+        
+        const packets = database.get(id);
+        packets[Number(current) - 1] = payload;
 
-            const pageNum = parseInt(head2[0]);
-            const totalPages = parseInt(head2[1]);
+        const loadedCount = packets.filter(p => p !== null).length;
+        const isComplete = loadedCount === Number(total);
 
-            // パズルのピースを格納
-            pages[pageNum] = body;
-
-            // 読み込み進捗を通知
+        if (isComplete) {
+            const fullPayload = packets.join("");
             self.postMessage({
-                type: "loading",
-                data: { current: pages.filter(Boolean).length, total: totalPages }
+                status: "complete",
+                id: id,
+                type: type,
+                data: fullPayload
             });
-
-            // すべてのピースが揃ったら、メインにレンダリング命令を投げる
-            if (pages.filter(Boolean).length === totalPages) {
-                const fullPayload = pages.join('');
-
-                // 汎用アクション: #sqore-root の中身を丸ごと書き換える
-                self.postMessage({
-                    type: "render",
-                    data: { selector: "#sqore-root", action: "html", val: fullPayload }
-                });
-            }
-        } catch (err) {
-            self.postMessage({ type: "error", data: { message: "Packet parsing failed" } });
+        } else {
+            self.postMessage({
+                status: "progress",
+                id: id,
+                loaded: loadedCount,
+                total: total
+            });
         }
     };
 `;
 
-const blob = new Blob([workerCode], { type: 'application/javascript' });
-const cultureWorker = new Worker(URL.createObjectURL(blob));
+const blob = new Blob([workerCode], { type: "application/javascript" });
+const worker = new Worker(URL.createObjectURL(blob));
 
-// ==========================================
-// 2. 抽象化された「最強のswitch」レシーバー
-// ==========================================
-cultureWorker.onmessage = function(e) {
-    const { type, data } = e.data;
-    const statusElem = document.getElementById("status");
+// --- [2] メインスレッドの処理 (UI・カメラ・描画) ---
+const video = document.getElementById("preview");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const statusText = document.getElementById("status-text");
+const appRoot = document.getElementById("app-root");
 
-    switch (type) {
-        case "render":
-            const targetElem = document.querySelector(data.selector);
-            if (!targetElem) return;
+let activeScan = true;
 
-            // アクションに応じた動的処理
-            if (data.action === "html") {
-                // 丸ごとHTMLを流し込む（天才の1行を拡張した安全なインジェクション）
-                targetElem.innerHTML = data.val;
-            } else {
-                // 属性やテキストの書き換え（例の「天才の1行」）
-                targetElem[data.action] = data.val; 
-            }
-            statusElem.textContent = "Application Hydrated Successfully.";
-            statusElem.style.color = "green";
-            break;
-
-        case "loading":
-            statusElem.textContent = `Scanning: ${data.current} / ${data.total} packets loaded.`;
-            statusElem.style.color = "#0066cc";
-            break;
-
-        case "error":
-            statusElem.textContent = "Error: " + data.message;
-            statusElem.style.color = "#ff3333";
-            break;
+// Web Workerからの結果を処理
+worker.onmessage = function(e) {
+    const res = e.data;
+    if (res.status === "progress") {
+        statusText.innerText = \`Scanning... [ID: \${res.id}] (\${res.loaded} / \${res.total} packets loaded)\`;
+    } else if (res.status === "complete") {
+        activeScan = false; // 読み込み完了したら一旦スキャン停止
+        statusText.style.color = "#4ade80";
+        statusText.innerText = "Application Hydrated Successfully.\\nRendering standard view...";
+        
+        // 復元されたHTMLを注入して表示
+        appRoot.innerHTML = res.data;
+        appRoot.style.display = "block";
+        
+        // 完了したらオーバーレイの枠をクリア
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 };
 
-// ==========================================
-// 3. jsQR スキャンエンジン
-// ==========================================
-const video = document.getElementById("video");
-const canvas = document.getElementById("preview");
-const ctx = canvas.getContext("2d");
-let lastReadCode = "";
-
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function(stream) {
-    video.srcObject = stream;
-    video.setAttribute("playsinline", true);
-    video.play();
-    requestAnimationFrame(tick);
-}).catch(err => {
-    // 背面カメラがない場合は標準カメラ
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+// カメラの起動
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
         video.srcObject = stream;
-        video.play();
+        statusText.innerText = "Ready. Scan phantomSqore paper packets.";
         requestAnimationFrame(tick);
+    })
+    .catch(err => {
+        statusText.innerText = "Camera Error: " + err.message;
     });
-});
 
+// QRコードの枠を描画する関数
+function drawLine(begin, end, color) {
+    ctx.beginPath();
+    ctx.moveTo(begin.x, begin.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+}
+
+// 毎フレームの認識・描画ループ
 function tick() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.height = video.videoHeight;
+    if (video.readyState === video.HAVE_ENOUGH_DATA && activeScan) {
+        // キャンバスのサイズをビデオの実際の解像度に合わせる
         canvas.width = video.videoWidth;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        canvas.height = video.videoHeight;
 
-        if (code && code.data !== lastReadCode) {
-            lastReadCode = code.data;
-            cultureWorker.postMessage(code.data);
+        // 一時的に非表示のキャンバスにビデオフレームを描写して画素データを取得
+        const hiddenCanvas = document.createElement("canvas");
+        hiddenCanvas.width = canvas.width;
+        hiddenCanvas.height = canvas.height;
+        const hiddenCtx = hiddenCanvas.getContext("2d");
+        hiddenCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // jsQRで解析
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+        });
+
+        // 画面上の古い枠を一回消去
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (code) {
+            // QRコードが見つかったら緑色の枠を描画！
+            const loc = code.location;
+            const strokeColor = "#4ade80"; // サイバーグリーン
+            
+            drawLine(loc.topLeftCorner, loc.topRightCorner, strokeColor);
+            drawLine(loc.topRightCorner, loc.bottomRightCorner, strokeColor);
+            drawLine(loc.bottomRightCorner, loc.bottomLeftCorner, strokeColor);
+            drawLine(loc.bottomLeftCorner, loc.topLeftCorner, strokeColor);
+
+            // Web Workerにデータを送信
+            worker.postMessage(code.data);
         }
     }
     requestAnimationFrame(tick);
 }
 </script>
+
 </body>
 </html>
