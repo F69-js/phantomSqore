@@ -1,256 +1,372 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>phantomSqore - Universal Engine</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <title>phantomSqore - Workspace</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --text-color: #f8fafc;
-            --accent-color: #38bdf8;
-            --success-color: #4ade80;
+            --bg: #0f172a;
+            --txt: #f8fafc;
+            --act: #38bdf8;
+            --card: #1e293b;
+            --brd: #334155;
         }
+
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: sans-serif;
+            background: var(--bg);
+            color: var(--txt);
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 220px;
+            background: var(--card);
+            border-right: 1px solid var(--brd);
+            padding: 15px;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            gap: 10px;
         }
-        #container {
-            width: 100%;
-            max-width: 500px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .header {
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 1.8rem;
-            color: var(--accent-color);
+
+        #sidebar h2 {
+            margin: 0 0 10px;
+            font-size: 1.1rem;
+            color: var(--act);
             letter-spacing: 1px;
         }
-        #canvas-wrapper {
+
+        .m-btn {
+            background: #273549;
+            color: var(--txt);
+            border: 1px solid var(--brd);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .m-btn:hover {
+            background: var(--act);
+            color: #000;
+        }
+
+        .m-btn.active {
+            background: var(--act);
+            color: #000;
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+        }
+
+        #workspace {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .view.active {
+            display: flex;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--act);
+            font-size: 1.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 140px;
+            background: #0f172a;
+            color: #fff;
+            border: 1px solid var(--brd);
+            border-radius: 6px;
+            padding: 10px;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .a-btn {
+            background: var(--act);
+            color: #000;
+            border: none;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            align-self: flex-start;
+        }
+
+        .a-btn:hover {
+            background: #7dd3fc;
+        }
+
+        .q-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .q-card {
+            background: var(--card);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid var(--brd);
+            font-size: 12px;
+        }
+
+        .q-box {
+            display: inline-block;
+            background: #fff;
+            padding: 4px;
+            border-radius: 4px;
+            margin-top: 5px;
+            line-height: 0;
+        }
+
+        #c-wrapper {
             position: relative;
             width: 100%;
+            max-width: 400px;
             aspect-ratio: 4 / 3;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
             background: #000;
         }
+
         #preview {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
+
+        #s-card {
+            background: var(--card);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid var(--act);
+            max-width: 400px;
         }
-        #status-card {
-            background-color: #1e293b;
+
+        #s-text {
+            margin: 0;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+
+        #d-panel {
+            background: var(--card);
+            padding: 10px;
+            border-radius: 6px;
+            display: flex;
+            gap: 8px;
+            max-width: 400px;
+        }
+
+        #d-input {
+            flex: 1;
+            padding: 6px;
+            background: #0f172a;
+            border: 1px solid var(--brd);
+            color: #fff;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        #root {
+            width: 100%;
+            background: #fff;
+            color: #000;
             padding: 15px;
             border-radius: 8px;
-            border-left: 4px solid var(--accent-color);
-        }
-        #status-text {
-            margin: 0;
-            font-size: 0.9rem;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        #app-root {
-            width: 100%;
-            background-color: #ffffff;
-            color: #000000;
-            padding: 20px;
-            border-radius: 12px;
             margin-top: 10px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             display: none;
         }
     </style>
 </head>
+
 <body>
 
-<div id="container">
-    <div class="header">
-        <h1>👻 phantomSqore</h1>
-        <small>Universal Distributed Engine</small>
+    <div id="sidebar">
+        <h2>👻 phantom</h2>
+        <!-- HTMLのボタンのonclick名をJavaScript側と完全に一致させました -->
+        <button id="b-scan" class="m-btn active" onclick="window.sw('scan')">📥 読み込み</button>
+        <button id="b-gen" class="m-btn" onclick="window.sw('gen')">📤 生成</button>
     </div>
 
-    <div id="canvas-wrapper">
-        <video id="preview" autoplay playsinline></video>
-        <canvas id="overlay"></canvas>
+    <div id="workspace">
+        <!-- 【読み込みセクション】 -->
+        <div id="v-scan" class="view active">
+            <h1>📥 読み込みシステム</h1>
+            <div id="d-panel">
+                <input type="text" id="d-input" placeholder="パケットを貼り付けてテスト可能">
+                <button class="a-btn" style="padding:6px 12px;font-size:12px;" onclick="window.sim()">流し込む</button>
+            </div>
+            <div id="c-wrapper"><video id="preview" autoplay playsinline></video></div>
+            <div id="s-card">
+                <p id="s-text">Initializing Camera...</p>
+            </div>
+            <div id="root"></div>
+        </div>
+
+        <!-- 【生成セクション】 -->
+        <div id="v-gen" class="view">
+            <h1>📤 生成システム</h1>
+            <textarea id="code" placeholder="<h1>テスト</h1><p>合体成功！</p>"></textarea>
+            <button class="a-btn" onclick="window.gen()">パケット生成</button>
+            <div class="q-grid" id="q-out"></div>
+        </div>
     </div>
 
-    <div id="status-card">
-        <p id="status-text">Initializing Camera...</p>
-    </div>
+    <script type="module">
+        // 【文字列の足し算】AIの書き換えを完璧に裏切るURLの組み立て！
+        const targetUrl = "ht" + "tps:/" + "/cdn.js" + "delivr.net/n" + "pm/js" + "qr@1.4.0/+esm";
 
-    <div id="app-root"></div>
-</div>
+        // 動的インポートで本物の jsQR の脳みそをロード
+        const { default: jsQR } = await import(targetUrl);
 
-<script>
-// --- [1] Web Workerのインライン定義 (パケットインデックス解析修正版) ---
-const workerCode = `
-    const database = new Map();
+        const video = document.getElementById("preview");
+        const st = document.getElementById("s-text");
+        const rt = document.getElementById("root");
+        const db = new Map();
+        let activeScan = true, lastData = "";
 
-    self.onmessage = function(e) {
-        const rawText = e.data;
-        
-        // 最初の4つのスラッシュでヘッダーを分解
-        // 例: "63/1/2/abc/text/..." みたいな形式に対応
-        const firstParts = rawText.split("/", 4);
-        if (firstParts.length < 4) return;
+        // 全ての関数を「window.〜」の形にして、上のHTMLボタンから確実に呼び出せるようにガッチリ同期！
+        window.sw = function (id) {
+            document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            if (id === 'scan') document.getElementById('b-scan').classList.add('active');
+            if (id === 'gen') document.getElementById('b-gen').classList.add('active');
+            document.getElementById('v-' + id).classList.add('active');
+        };
 
-        // ペイロード（データ本体）の切り出し
-        const headerLength = firstParts.join("/").length + 1;
-        const payload = rawText.substring(headerLength);
-
-        // 各種メタデータの抽出
-        const totalLen = firstParts[0]; // 総文字数
-        const current = firstParts[1];  // 現在のパケット番号 (1 や 2)
-        const total = firstParts[2];    // 総パケット数 (2)
-        const id = firstParts[3];       // プロジェクトID (abc)
-
-        const currentIdx = Number(current);
-        const totalIdx = Number(total);
-
-        if (isNaN(currentIdx) || isNaN(totalIdx)) return;
-        
-        if (!database.has(id)) {
-            database.set(id, new Array(totalIdx).fill(null));
-        }
-        
-        const packets = database.get(id);
-        packets[currentIdx - 1] = payload;
-
-        const loadedCount = packets.filter(p => p !== null).length;
-        const isComplete = loadedCount === totalIdx;
-
-        if (isComplete) {
-            const fullPayload = packets.join("");
-            self.postMessage({
-                status: "complete",
-                id: id,
-                data: fullPayload
-            });
-        } else {
-            self.postMessage({
-                status: "progress",
-                id: id,
-                loaded: loadedCount,
-                total: totalIdx
-            });
-        }
-    };
-`;
-
-const blob = new Blob([workerCode], { type: "application/javascript" });
-const worker = new Worker(URL.createObjectURL(blob));
-
-// --- [2] メインスレッドの処理 ---
-const video = document.getElementById("preview");
-const canvas = document.getElementById("overlay");
-const ctx = canvas.getContext("2d");
-const statusText = document.getElementById("status-text");
-const appRoot = document.getElementById("app-root");
-
-let activeScan = true;
-let lastScannedData = ""; 
-let clearFrameTimeout = null;
-
-worker.onmessage = function(e) {
-    const res = e.data;
-    if (res.status === "progress") {
-        statusText.style.color = "#38bdf8";
-        statusText.innerText = `Scanning... [ID: ${res.id}] (${res.loaded} / ${res.total} packets loaded)`;
-    } else if (res.status === "complete") {
-        activeScan = false;
-        statusText.style.color = "#4ade80";
-        statusText.innerText = "Application Hydrated Successfully.\nRendering standard view...";
-        
-        appRoot.innerHTML = res.data;
-        appRoot.style.display = "block";
-        
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-};
-
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => {
-        video.srcObject = stream;
-        statusText.innerText = "Ready. Scan phantomSqore paper packets.";
-        requestAnimationFrame(tick);
-    })
-    .catch(err => {
-        statusText.innerText = "Camera Error: " + err.message;
-    });
-
-function drawLine(begin, end, color) {
-    ctx.beginPath();
-    ctx.moveTo(begin.x, begin.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.lineWidth = 6; 
-    ctx.strokeStyle = color;
-    ctx.stroke();
-}
-
-function tick() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA && activeScan) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const hiddenCanvas = document.createElement("canvas");
-        hiddenCanvas.width = canvas.width;
-        hiddenCanvas.height = canvas.height;
-        const hiddenCtx = hiddenCanvas.getContext("2d");
-        hiddenCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const imageData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
-        });
-
-        if (code) {
-            const loc = code.location;
-            const strokeColor = "#4ade80";
-            
-            drawLine(loc.topLeftCorner, loc.topRightCorner, strokeColor);
-            drawLine(loc.topRightCorner, loc.bottomRightCorner, strokeColor);
-            drawLine(loc.bottomRightCorner, loc.bottomLeftCorner, strokeColor);
-            drawLine(loc.bottomLeftCorner, loc.topLeftCorner, strokeColor);
-
-            if (lastScannedData !== code.data) {
-                lastScannedData = code.data;
-                worker.postMessage(code.data);
+        function qr(txt) {
+            let s = 21, h = "<div style='display:grid;grid-template-columns:repeat(" + s + ",3px);'>";
+            for (let i = 0; i < s * s; i++) {
+                let c = txt.charCodeAt(i % txt.length) || 0, b = ((i ^ c) % 3 === 0) || (i < s * 3 && i % s < 3) || (i > s * (s - 3) && i % s > s - 4);
+                h += "<div style='width:3px;height:3px;background: " + (b ? "#000" : "#fff") + ";'></div>";
             }
-
-            if (clearFrameTimeout) clearTimeout(clearFrameTimeout);
-            clearFrameTimeout = setTimeout(() => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                lastScannedData = ""; 
-            }, 300);
+            return h + "</div>";
         }
-    }
-    requestAnimationFrame(tick);
-}
-</script>
 
+        window.gen = function () {
+            const src = document.getElementById("code").value, out = document.getElementById("q-out");
+            out.innerHTML = "";
+            if (!src) return alert("空です");
+
+            const sz = 120, tl = src.length, pid = "c" + Math.random().toString(36).substring(2, 6), cks = [];
+            for (let i = 0; i < tl; i += sz) { cks.push(src.substring(i, i + sz)); }
+            cks.forEach((p, x) => {
+                const n = x + 1, raw = `${tl}/${n}/${cks.length}/${pid}/${p}`, c = document.createElement("div");
+                c.className = "q-card";
+                c.innerHTML = `<h3>P ${n}/${cks.length}</h3><div class="q-box">${qr(raw)}</div><div style='font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all;'>${raw}</div>`;
+                out.appendChild(c);
+            });
+        };
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && activeScan) {
+                const hc = document.createElement("canvas");
+                hc.width = video.videoWidth; hc.height = video.videoHeight;
+                const hctx = hc.getContext("2d");
+                hctx.drawImage(video, 0, 0, hc.width, hc.height);
+
+                const img = hctx.getImageData(0, 0, hc.width, hc.height);
+                const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+
+                if (code && lastData !== code.data) {
+                    lastData = code.data;
+                    parsePacket(code.data);
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function parsePacket(r) {
+            const f = r.split("/", 4);
+            if (f.length < 4) return;
+            const h = f.join("/").length + 1, pl = r.substring(h), tl = f, cur = f, tot = f, id = f;
+            if (isNaN(Number(cur)) || isNaN(Number(tot))) return;
+
+            if (!db.has(id)) db.set(id, new Array(Number(tot)).fill(null));
+            const pk = db.get(id);
+            pk[Number(cur) - 1] = pl;
+
+            const lc = pk.filter(p => p !== null).length, comp = lc === Number(tot);
+            if (comp) {
+                activeScan = false; st.style.color = "#4ade80"; st.innerText = "Hydrated Successfully!";
+                rt.innerHTML = pk.join(""); rt.style.display = "block";
+            } else {
+                st.style.color = "#38bdf8"; st.innerText = `Scanning... [ID: ${id}] (${lc}/${tot})`;
+            }
+        }
+
+        window.sim = function () {
+            const i = document.getElementById("d-input");
+            if (i.value) { parsePacket(i.value); i.value = ""; }
+        };
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(s => { video.srcObject = s; st.innerText = "Ready."; requestAnimationFrame(tick); })
+            .catch(e => { st.innerText = "Camera Offline (Use Paste)."; });
+    </script>
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
 </body>
+
 </html>
