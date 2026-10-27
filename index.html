@@ -3,254 +3,284 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>phantomSqore - Workspace</title>
     <style>
-        :root {
-            --bg: #0f172a;
-            --txt: #f8fafc;
-            --act: #38bdf8;
-            --card: #1e293b;
-            --brd: #334155;
-        }
+:root {
+  --bg: #0f172a;
+  --txt: #f8fafc;
+  --act: #38bdf8;
+  --card: #1e293b;
+  --brd: #334155;
+}
+body {
+  font-family: sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+#sidebar {
+  width: 220px;
+  background: var(--card);
+  border-right: 1px solid var(--brd);
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#sidebar h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  color: var(--act);
+  letter-spacing: 1px;
+}
+.m-btn {
+  background: #273549;
+  color: var(--txt);
+  border: 1px solid var(--brd);
+  padding: 12px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.m-btn:hover {
+  background: var(--act);
+  color: #000;
+}
+.m-btn.active {
+  background: var(--act);
+  color: #000;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+}
+#workspace {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+#workspace.no-pad {
+  padding: 0 !important;
+}
+.view {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.view.active {
+  display: flex;
+}
+h1 {
+  margin: 0;
+  color: var(--act);
+  font-size: 1.5rem;
+}
+textarea {
+  width: 100%;
+  height: 140px;
+  background: #0f172a;
+  color: #fff;
+  border: 1px solid var(--brd);
+  border-radius: 6px;
+  padding: 10px;
+  box-sizing: border-box;
+  font-family: monospace;
+  font-size: 13px;
+}
+.a-btn {
+  background: var(--act);
+  color: #000;
+  border: none;
+  padding: 10px 15px;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  align-self: flex-start;
+}
+.a-btn:hover {
+  background: #7dd3fc;
+}
+.q-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+  width: 100%;
+}
+.q-card {
+  background: var(--card);
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid var(--brd);
+  font-size: 12px;
+}
+.q-box {
+  display: inline-block;
+  background: #fff;
+  padding: 4px;
+  border-radius: 4px;
+  margin-top: 5px;
+  line-height: 0;
+}
+.q-box canvas {
+  width: 120px !important;
+  height: 120px !important;
+}
+.q-grid.compact {
+  gap: 0 !important;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+  margin-top: 0 !important;
+}
+.q-grid.compact .q-card {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  width: 120px !important;
+  height: 120px !important;
+}
+.q-grid.compact .q-card h3,
+.q-grid.compact .q-card div:not(.q-box) {
+  display: none !important;
+}
+.q-grid.compact .q-box {
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+.q-grid.compact .q-box canvas {
+  width: 120px !important;
+  height: 120px !important;
+}
+#c-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+#preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#s-card {
+  background: var(--card);
+  padding: 10px;
+  border-radius: 6px;
+  border-left: 4px solid var(--act);
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#s-text {
+  margin: 0;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+#p-bar {
+  width: 100%;
+  height: 6px;
+  background: #334155;
+  border-radius: 3px;
+  overflow: hidden;
+  display: none;
+}
+#p-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--act);
+  transition: width 0.1s;
+}
+#d-panel {
+  background: var(--card);
+  padding: 10px;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 400px;
+}
+#d-input {
+  flex: 1;
+  min-width: 150px;
+  padding: 6px;
+  background: #0f172a;
+  border: 1px solid var(--brd);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+}
+#root {
+  width: 100%;
+  background: #fff;
+  color: #000;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 10px;
+  display: none;
+}
 
-        body {
-            font-family: sans-serif;
-            background: var(--bg);
-            color: var(--txt);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #sidebar {
-            width: 220px;
-            background: var(--card);
-            border-right: 1px solid var(--brd);
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        #sidebar h2 {
-            margin: 0 0 10px;
-            font-size: 1.1rem;
-            color: var(--act);
-            letter-spacing: 1px;
-        }
-
-        .m-btn {
-            background: #273549;
-            color: var(--txt);
-            border: 1px solid var(--brd);
-            padding: 12px;
-            border-radius: 6px;
-            text-align: left;
-            font-size: 0.9rem;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .m-btn:hover {
-            background: var(--act);
-            color: #000;
-        }
-
-        .m-btn.active {
-            background: var(--act);
-            color: #000;
-            box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
-        }
-
-        #workspace {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .view {
-            display: none;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .view.active {
-            display: flex;
-        }
-
-        h1 {
-            margin: 0;
-            color: var(--act);
-            font-size: 1.5rem;
-        }
-
-        textarea {
-            width: 100%;
-            height: 140px;
-            background: #0f172a;
-            color: #fff;
-            border: 1px solid var(--brd);
-            border-radius: 6px;
-            padding: 10px;
-            box-sizing: border-box;
-            font-family: monospace;
-            font-size: 13px;
-        }
-
-        .a-btn {
-            background: var(--act);
-            color: #000;
-            border: none;
-            padding: 10px 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            align-self: flex-start;
-        }
-
-        .a-btn:hover {
-            background: #7dd3fc;
-        }
-
-        .q-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .q-card {
-            background: var(--card);
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
-            border: 1px solid var(--brd);
-            font-size: 12px;
-        }
-
-        .q-box {
-            display: inline-block;
-            background: #fff;
-            padding: 4px;
-            border-radius: 4px;
-            margin-top: 5px;
-            line-height: 0;
-        }
-
-        #c-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            aspect-ratio: 4 / 3;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #000;
-        }
-
-        #preview {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        #s-card {
-            background: var(--card);
-            padding: 10px;
-            border-radius: 6px;
-            border-left: 4px solid var(--act);
-            max-width: 400px;
-        }
-
-        #s-text {
-            margin: 0;
-            font-size: 0.85rem;
-            font-family: monospace;
-        }
-
-        #d-panel {
-            background: var(--card);
-            padding: 10px;
-            border-radius: 6px;
-            display: flex;
-            gap: 8px;
-            max-width: 400px;
-        }
-
-        #d-input {
-            flex: 1;
-            padding: 6px;
-            background: #0f172a;
-            border: 1px solid var(--brd);
-            color: #fff;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        #root {
-            width: 100%;
-            background: #fff;
-            color: #000;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 10px;
-            display: none;
-        }
     </style>
 </head>
 
 <body>
-
     <div id="sidebar">
         <h2>👻 phantom</h2>
-        <!-- HTMLのボタンのonclick名をJavaScript側と完全に一致させました -->
         <button id="b-scan" class="m-btn active" onclick="window.sw('scan')">📥 読み込み</button>
         <button id="b-gen" class="m-btn" onclick="window.sw('gen')">📤 生成</button>
     </div>
-
     <div id="workspace">
-        <!-- 【読み込みセクション】 -->
         <div id="v-scan" class="view active">
             <h1>📥 読み込みシステム</h1>
             <div id="d-panel">
                 <input type="text" id="d-input" placeholder="パケットを貼り付けてテスト可能">
                 <button class="a-btn" style="padding:6px 12px;font-size:12px;" onclick="window.sim()">流し込む</button>
+                <input type="file" id="f-input" accept="image/*" style="display:none" onchange="window.upl(this)">
+                <button class="a-btn" style="padding:6px 12px;font-size:12px;background:#94a3b8"
+                    onclick="document.getElementById('f-input').click()">🖼️ スクショ読込</button>
             </div>
-            <div id="c-wrapper"><video id="preview" autoplay playsinline></video></div>
+            <div id="c-wrapper">
+                <video id="preview" autoplay playsinline></video>
+            </div>
             <div id="s-card">
                 <p id="s-text">Initializing Camera...</p>
+                <div id="p-bar">
+                    <div id="p-fill"></div>
+                </div>
             </div>
             <div id="root"></div>
         </div>
-
-        <!-- 【生成セクション】 -->
         <div id="v-gen" class="view">
             <h1>📤 生成システム</h1>
             <textarea id="code" placeholder="<h1>テスト</h1><p>合体成功！</p>"></textarea>
-            <button class="a-btn" onclick="window.gen()">パケット生成</button>
+            <div style="display:flex;gap:8px;">
+                <button class="a-btn" onclick="window.gen()">パケット生成</button>
+                <button class="a-btn" style="background:#475569;color:#fff;" onclick="window.tgl()">一覧モード切替</button>
+            </div>
             <div class="q-grid" id="q-out"></div>
         </div>
     </div>
-
     <script type="module">
-        // 【文字列の足し算】AIの書き換えを完璧に裏切るURLの組み立て！
-        const targetUrl = "ht" + "tps:/" + "/cdn.js" + "delivr.net/n" + "pm/js" + "qr@1.4.0/+esm";
-
-        // 動的インポートで本物の jsQR の脳みそをロード
-        const { default: jsQR } = await import(targetUrl);
-
-        const video = document.getElementById("preview");
-        const st = document.getElementById("s-text");
-        const rt = document.getElementById("root");
-        const db = new Map();
+        const jsqrUrl = "ht" + "tps:/" + "/cdn.js" + "delivr.net/n" + "pm/js" + "qr@1.4.0/+esm";
+        const qrcodeUrl = "ht" + "tps:/" + "/cdn.js" + "delivr.net/n" + "pm/qr" + "code@1.5.1/+esm";
+        const [{default: jsQR}, {default: QRCode}] = await Promise.all([import(jsqrUrl), import(qrcodeUrl)]);
+        const video = document.getElementById("preview"), st = document.getElementById("s-text"), pBar = document.getElementById("p-bar"), pFill = document.getElementById("p-fill"), rt = document.getElementById("root"), db = new Map();
         let activeScan = true, lastData = "";
 
-        // 全ての関数を「window.〜」の形にして、上のHTMLボタンから確実に呼び出せるようにガッチリ同期！
         window.sw = function (id) {
             document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -259,61 +289,48 @@
             document.getElementById('v-' + id).classList.add('active');
         };
 
-        function qr(txt) {
-            let s = 21, h = "<div style='display:grid;grid-template-columns:repeat(" + s + ",3px);'>";
-            for (let i = 0; i < s * s; i++) {
-                let c = txt.charCodeAt(i % txt.length) || 0, b = ((i ^ c) % 3 === 0) || (i < s * 3 && i % s < 3) || (i > s * (s - 3) && i % s > s - 4);
-                h += "<div style='width:3px;height:3px;background: " + (b ? "#000" : "#fff") + ";'></div>";
-            }
-            return h + "</div>";
-        }
+        window.tgl = function () {
+            const ws = document.getElementById("workspace"), qo = document.getElementById("q-out");
+            ws.classList.toggle("no-pad"); qo.classList.toggle("compact");
+        };
 
         window.gen = function () {
             const src = document.getElementById("code").value, out = document.getElementById("q-out");
-            out.innerHTML = "";
-            if (!src) return alert("空です");
-
-            const sz = 120, tl = src.length, pid = "c" + Math.random().toString(36).substring(2, 6), cks = [];
-            for (let i = 0; i < tl; i += sz) { cks.push(src.substring(i, i + sz)); }
+            out.innerHTML = ""; if (!src) return alert("空です");
+            const sz = 50, tl = src.length, pid = "c" + Math.random().toString(36).substring(2, 6), cks = [];
+            for (let i = 0; i < tl; i += sz) {cks.push(src.substring(i, i + sz))}
             cks.forEach((p, x) => {
                 const n = x + 1, raw = `${tl}/${n}/${cks.length}/${pid}/${p}`, c = document.createElement("div");
                 c.className = "q-card";
-                c.innerHTML = `<h3>P ${n}/${cks.length}</h3><div class="q-box">${qr(raw)}</div><div style='font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all;'>${raw}</div>`;
+                c.innerHTML = `<h3>P ${n}/${cks.length}</h3><div class="q-box"></div><div style='font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all;'>${raw}</div>`;
+                const qb = c.querySelector('.q-box'), cv = document.createElement('canvas');
+                qb.appendChild(cv);
+                QRCode.toCanvas(cv, raw, {width: 120, margin: 2}, function (err) {if (err) console.error(err)});
                 out.appendChild(c);
             });
         };
 
         function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && activeScan) {
-                const hc = document.createElement("canvas");
-                hc.width = video.videoWidth; hc.height = video.videoHeight;
-                const hctx = hc.getContext("2d");
-                hctx.drawImage(video, 0, 0, hc.width, hc.height);
-
-                const img = hctx.getImageData(0, 0, hc.width, hc.height);
-                const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
-
-                if (code && lastData !== code.data) {
-                    lastData = code.data;
-                    parsePacket(code.data);
-                }
+                const hc = document.createElement("canvas"); hc.width = video.videoWidth; hc.height = video.videoHeight;
+                hc.getContext("2d").drawImage(video, 0, 0, hc.width, hc.height);
+                const img = hc.getContext("2d").getImageData(0, 0, hc.width, hc.height);
+                const code = jsQR(img.data, img.width, img.height, {inversionAttempts: "attemptBoth"});
+                if (code && lastData !== code.data) {lastData = code.data; parsePacket(code.data)}
             }
             requestAnimationFrame(tick);
         }
 
         function parsePacket(r) {
-            const f = r.split("/", 4);
-            if (f.length < 4) return;
-            const h = f.join("/").length + 1, pl = r.substring(h), tl = f, cur = f, tot = f, id = f;
+            const f = r.split("/", 4); if (f.length < 4) return;
+            const tl = f.at(0), cur = f.at(1), tot = f.at(2), id = f.at(3), h = f.join("/").length + 1, pl = r.substring(h);
             if (isNaN(Number(cur)) || isNaN(Number(tot))) return;
-
             if (!db.has(id)) db.set(id, new Array(Number(tot)).fill(null));
-            const pk = db.get(id);
-            pk[Number(cur) - 1] = pl;
-
+            const pk = db.get(id); pk[Number(cur) - 1] = pl;
             const lc = pk.filter(p => p !== null).length, comp = lc === Number(tot);
+            pBar.style.display = "block"; const pct = (lc / Number(tot)) * 100; pFill.style.width = `${pct}%`;
             if (comp) {
-                activeScan = false; st.style.color = "#4ade80"; st.innerText = "Hydrated Successfully!";
+                activeScan = false; pFill.style.background = "#4ade80"; st.style.color = "#4ade80"; st.innerText = "Hydrated Successfully!";
                 rt.innerHTML = pk.join(""); rt.style.display = "block";
             } else {
                 st.style.color = "#38bdf8"; st.innerText = `Scanning... [ID: ${id}] (${lc}/${tot})`;
@@ -321,15 +338,58 @@
         }
 
         window.sim = function () {
-            const i = document.getElementById("d-input");
-            if (i.value) { parsePacket(i.value); i.value = ""; }
+            const i = document.getElementById("d-input"); if (i.value) {parsePacket(i.value); i.value = ""}
         };
 
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(s => { video.srcObject = s; st.innerText = "Ready."; requestAnimationFrame(tick); })
-            .catch(e => { st.innerText = "Camera Offline (Use Paste)."; });
+        function procImg(img) {
+            const hc = document.createElement("canvas"), w = img.width, h = img.height; hc.width = w; hc.height = h;
+            const ctx = hc.getContext("2d"); ctx.drawImage(img, 0, 0);
+            const res = []; let att = 0;
+            while (att < 300) {
+                const imgData = ctx.getImageData(0, 0, w, h), code = jsQR(imgData.data, w, h, {inversionAttempts: "attemptBoth"});
+                if (!code) break;
+                const l = code.location, cx = (l.topLeftCorner.x + l.bottomRightCorner.x) / 2, cy = (l.topLeftCorner.y + l.bottomRightCorner.y) / 2;
+                const xMin = Math.floor(Math.min(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
+                const yMin = Math.floor(Math.min(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
+                const xMax = Math.ceil(Math.max(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
+                const yMax = Math.ceil(Math.max(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
+                const qw = xMax - xMin, qh = yMax - yMin;
+                if (qw > 10 && qh > 10) {
+                    const baseW = 300, baseH = 300, cc = document.createElement("canvas"); cc.width = baseW; cc.height = baseH;
+                    const cCtx = cc.getContext("2d"); cCtx.fillStyle = "#ff0000"; cCtx.fillRect(0, 0, baseW, baseH);
+                    const destW = 200, destH = Math.floor(qh * (destW / qw)), dx = Math.floor((baseW - destW) / 2), dy = Math.floor((baseH - destH) / 2);
+                    cCtx.drawImage(hc, xMin, yMin, qw, qh, dx, dy, destW, destH);
+                    const fnData = cCtx.getImageData(0, 0, baseW, baseH), subCode = jsQR(fnData.data, baseW, baseH, {inversionAttempts: "attemptBoth"});
+                    res.push({data: subCode ? subCode.data : code.data, x: cx, y: cy, h: qh});
+                }
+                ctx.fillStyle = "#00ff00"; ctx.fillRect(xMin - 2, yMin - 2, qw + 4, qh + 4); att++;
+            }
+            if (res.length > 0) {
+                res.sort((a, b) => {const th = Math.min(a.h, b.h) * 0.6; return Math.abs(a.y - b.y) < th ? a.x - b.x : a.y - b.y});
+                res.forEach(r => parsePacket(r.data));
+            } else {alert("QRコードが検出されませんでした。")}
+        }
+
+        window.upl = function (el) {
+            const files = el.files; if (!files || files.length === 0) return;
+            const tgtFile = files.item(0), reader = new FileReader();
+            reader.onload = function (e) {const img = new Image(); img.onload = function () {procImg(img)}; img.src = e.target.result};
+            reader.readAsDataURL(tgtFile); el.value = "";
+        };
+
+        window.addEventListener("paste", function (e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items.item(i).type.indexOf("image") !== -1) {
+                    const blob = items.item(i).getAsFile(), reader = new FileReader();
+                    reader.onload = function (event) {const img = new Image(); img.onload = function () {procImg(img)}; img.src = event.target.result};
+                    reader.readAsDataURL(blob); break;
+                }
+            }
+        });
+
+        navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}}).then(s => {video.srcObject = s; st.innerText = "Ready."; requestAnimationFrame(tick)}).catch(e => {st.innerText = "Camera Offline (Use Paste/Upload)."});
     </script>
-</script>
 </body>
 
 </html>
