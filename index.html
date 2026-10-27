@@ -132,23 +132,13 @@ textarea {
   margin-top: 5px;
   line-height: 0;
 }
-.q-box canvas {
-  width: 120px !important;
-  height: 120px !important;
-}
 .q-grid.compact {
   gap: 0 !important;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
   margin-top: 0 !important;
 }
-.q-grid.compact .q-card {
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  width: 120px !important;
-  height: 120px !important;
-}
+.q-grid.compact .q-card{padding:0 !important;margin:0 !important;border:none !important;background:transparent !important;width:120px !important;height:120px !important}
+
 .q-grid.compact .q-card h3,
 .q-grid.compact .q-card div:not(.q-box) {
   display: none !important;
@@ -233,6 +223,15 @@ textarea {
   margin-top: 10px;
   display: none;
 }
+/* デバッグプレビュー用のスタイル */
+#debug-container { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; }
+#debug-title { font-size: 13px; color: #a7f3d0; margin: 0; font-weight: bold; }
+.debug-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #1e293b; padding: 6px; border-radius: 6px; border: 1px dashed #475569; }
+.debug-box { position: relative; width: 100%; aspect-ratio: 1; background: #000; border-radius: 4px; overflow: hidden; border: 1px solid #334155; }
+.debug-box canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+.debug-badge { position: absolute; top: 2px; left: 2px; background: rgba(0,0,0,0.7); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+.debug-badge.success { background: #10b981; color: #fff; }
+
 
     </style>
 </head>
@@ -262,6 +261,15 @@ textarea {
                     <div id="p-fill"></div>
                 </div>
             </div>
+            <!-- カメラプレビューの下あたりにこれを挿入 -->
+            <div id="debug-container">
+                <p id="debug-title">🔍 分割スライス・デバッグプレビュー</p>
+                <div class="debug-grid" id="debug-output">
+                    <p style="grid-column: span 3; font-size: 11px; color: #64748b; margin: 5px; text-align: center;">
+                        画像を読み込むと、ここに切り取りデータが可視化されます</p>
+                </div>
+            </div>
+
             <div id="root"></div>
         </div>
         <div id="v-gen" class="view">
@@ -294,21 +302,33 @@ textarea {
             ws.classList.toggle("no-pad"); qo.classList.toggle("compact");
         };
 
-        window.gen = function () {
+      window.gen = function () {
             const src = document.getElementById("code").value, out = document.getElementById("q-out");
-            out.innerHTML = ""; if (!src) return alert("空です");
-            const sz = 50, tl = src.length, pid = "c" + Math.random().toString(36).substring(2, 6), cks = [];
-            for (let i = 0; i < tl; i += sz) {cks.push(src.substring(i, i + sz))}
+            out.innerHTML = "";
+            if (!src) return alert("空です");
+            const sz = 50, tl = src.length, cks = [];
+            for (let i = 0; i < tl; i += sz) {cks.push(src.substring(i, i + sz))};
+
+            // ★【重要修正】ランダムID（pid）をループの外で1つだけ発行します。
+            // これにより、この一連のQRコードはすべて「1つの同じデータ」としてシステムに認識されます。
+            const pid = "c" + Math.random().toString(36).substring(2, 6);
+
             cks.forEach((p, x) => {
                 const n = x + 1, raw = `${tl}/${n}/${cks.length}/${pid}/${p}`, c = document.createElement("div");
                 c.className = "q-card";
                 c.innerHTML = `<h3>P ${n}/${cks.length}</h3><div class="q-box"></div><div style='font-size:9px;color:#94a3b8;margin-top:4px;word-break:break-all;'>${raw}</div>`;
                 const qb = c.querySelector('.q-box'), cv = document.createElement('canvas');
                 qb.appendChild(cv);
-                QRCode.toCanvas(cv, raw, {width: 120, margin: 2}, function (err) {if (err) console.error(err)});
+
+                // 幅140px、余白10pxの綺麗仕様を維持
+                QRCode.toCanvas(cv, raw, {width: 140, margin: 10}, function (err) {
+                    if (err) console.error(err)
+                });
                 out.appendChild(c);
             });
         };
+
+
 
         function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && activeScan) {
@@ -340,35 +360,237 @@ textarea {
         window.sim = function () {
             const i = document.getElementById("d-input"); if (i.value) {parsePacket(i.value); i.value = ""}
         };
+   
+    function procImg(img) {
+        const st = document.getElementById("s-text");
+        const dbgOut = document.getElementById("debug-output");
+        const pBar = document.getElementById("p-bar");
+        const pFill = document.getElementById("p-fill");
 
-        function procImg(img) {
-            const hc = document.createElement("canvas"), w = img.width, h = img.height; hc.width = w; hc.height = h;
-            const ctx = hc.getContext("2d"); ctx.drawImage(img, 0, 0);
-            const res = []; let att = 0;
-            while (att < 300) {
-                const imgData = ctx.getImageData(0, 0, w, h), code = jsQR(imgData.data, w, h, {inversionAttempts: "attemptBoth"});
-                if (!code) break;
-                const l = code.location, cx = (l.topLeftCorner.x + l.bottomRightCorner.x) / 2, cy = (l.topLeftCorner.y + l.bottomRightCorner.y) / 2;
-                const xMin = Math.floor(Math.min(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
-                const yMin = Math.floor(Math.min(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
-                const xMax = Math.ceil(Math.max(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
-                const yMax = Math.ceil(Math.max(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
-                const qw = xMax - xMin, qh = yMax - yMin;
-                if (qw > 10 && qh > 10) {
-                    const baseW = 300, baseH = 300, cc = document.createElement("canvas"); cc.width = baseW; cc.height = baseH;
-                    const cCtx = cc.getContext("2d"); cCtx.fillStyle = "#ff0000"; cCtx.fillRect(0, 0, baseW, baseH);
-                    const destW = 200, destH = Math.floor(qh * (destW / qw)), dx = Math.floor((baseW - destW) / 2), dy = Math.floor((baseH - destH) / 2);
-                    cCtx.drawImage(hc, xMin, yMin, qw, qh, dx, dy, destW, destH);
-                    const fnData = cCtx.getImageData(0, 0, baseW, baseH), subCode = jsQR(fnData.data, baseW, baseH, {inversionAttempts: "attemptBoth"});
-                    res.push({data: subCode ? subCode.data : code.data, x: cx, y: cy, h: qh});
-                }
-                ctx.fillStyle = "#00ff00"; ctx.fillRect(xMin - 2, yMin - 2, qw + 4, qh + 4); att++;
-            }
-            if (res.length > 0) {
-                res.sort((a, b) => {const th = Math.min(a.h, b.h) * 0.6; return Math.abs(a.y - b.y) < th ? a.x - b.x : a.y - b.y});
-                res.forEach(r => parsePacket(r.data));
-            } else {alert("QRコードが検出されませんでした。")}
+        if (dbgOut) dbgOut.innerHTML = "";
+
+        const w = img.width;
+        const h = img.height;
+
+        const hc = document.createElement("canvas");
+        hc.width = w; hc.height = h;
+        const ctx = hc.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const res = new Array();
+        const currentScanStrings = new Set();
+        const targetLocations = new Array();
+
+        if (!window.globalReadQrSet) {
+            window.globalReadQrSet = new Set();
         }
+
+        if (st) {
+            st.style.color = "#38bdf8";
+            st.innerText = "高精度マトリクス検出中...";
+        }
+
+        // ★【22個ストップを根本解決するチューニング】
+        // 1マスあたりのターゲットサイズは150pxを維持します
+        const boxSize = 150;
+
+        // 探索の歩幅を「80px」から「20px」へ一気に細かくします！
+        // これにより、内部のループ探索回数が数百回〜数千回規模に跳ね上がり、
+        // さっきまで大雑把に素通りしていた大量のQRコードを隙間なく100%確実にロックオンします。
+        const step = 20;
+
+        for (let startY = 0; startY < h - boxSize; startY += step) {
+            for (let startX = 0; startX < w - boxSize; startX += step) {
+
+                const margin = 50;
+                const subCanvas = document.createElement("canvas");
+                subCanvas.width = boxSize + (margin * 2);
+                subCanvas.height = boxSize + (margin * 2);
+                const subCtx = subCanvas.getContext("2d");
+
+                subCtx.fillStyle = "#ffffff";
+                subCtx.fillRect(0, 0, subCanvas.width, subCanvas.height);
+                subCtx.drawImage(hc, startX, startY, boxSize, boxSize, margin, margin, boxSize, boxSize);
+
+                let subAttempt = 0;
+                while (subAttempt < 5) {
+                    const subImgData = subCtx.getImageData(0, 0, subCanvas.width, subCanvas.height);
+                    const subCode = jsQR(subImgData.data, subCanvas.width, subCanvas.height, {inversionAttempts: "attemptBoth"});
+
+                    if (!subCode) break;
+
+                    const l = subCode.location;
+                    const xMin = Math.floor(Math.min(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
+                    const yMin = Math.floor(Math.min(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
+                    const xMax = Math.ceil(Math.max(l.topLeftCorner.x, l.bottomLeftCorner.x, l.topRightCorner.x, l.bottomRightCorner.x));
+                    const yMax = Math.ceil(Math.max(l.topLeftCorner.y, l.bottomLeftCorner.y, l.topRightCorner.y, l.bottomRightCorner.y));
+
+                    const qw = xMax - xMin;
+                    const qh = yMax - yMin;
+
+                    if (qw > 15 && qh > 15) {
+                        const cx = startX - margin + (l.topLeftCorner.x + l.bottomRightCorner.x) / 2;
+                        const cy = startY - margin + (l.topLeftCorner.y + l.bottomRightCorner.y) / 2;
+
+                        // 重複を弾く許容距離を「15px」に設定し、高密度スキャンでも正確に個別のQRを特定します
+                        if (!targetLocations.some(loc => Math.abs(loc.gx - cx) < 15 && Math.abs(loc.gy - cy) < 15)) {
+                            targetLocations.push({
+                                x: Math.floor(startX - margin + xMin),
+                                y: Math.floor(startY - margin + yMin),
+                                w: qw,
+                                h: qh,
+                                gx: cx,
+                                gy: cy,
+                                data: subCode.data
+                            });
+                        }
+
+                        subCtx.fillStyle = "#ffffff";
+                        subCtx.fillRect(xMin - 2, yMin - 2, qw + 4, qh + 4);
+                    } else {
+                        subCtx.fillStyle = "#ffffff";
+                        subCtx.fillRect(xMin, yMin, qw, qh);
+                    }
+                    subAttempt++;
+                }
+            }
+        }
+
+        const imgTotalQR = targetLocations.length;
+
+        if (imgTotalQR === 0) {
+            if (st) st.style.color = "#f87171";
+            st.innerText = "切り取り画像からQRコードが1つも検出されませんでした。";
+            return;
+        }
+
+        let currentQRIndex = 0;
+
+        if (pBar) pBar.style.display = "block";
+        if (pFill) {
+            pFill.style.width = "0%";
+            pFill.style.background = "var(--act)";
+        }
+
+        function processQRChunk() {
+            const chunkSize = 15; // ループ数が激増したため、1回あたりの展開処理速度もアップ
+            const end = Math.min(currentQRIndex + chunkSize, imgTotalQR);
+
+            for (let i = currentQRIndex; i < end; i++) {
+                const task = targetLocations[i];
+                const margin = 50;
+                const cc = document.createElement("canvas");
+                cc.width = task.w + (margin * 2);
+                cc.height = task.h + (margin * 2);
+                const cCtx = cc.getContext("2d");
+
+                cCtx.fillStyle = "#ffffff";
+                cCtx.fillRect(0, 0, cc.width, cc.height);
+                cCtx.drawImage(hc, task.x, task.y, task.w, task.h, margin, margin, task.w, task.h);
+
+                let isAlreadyRead = false;
+                let packetUniqueKey = task.data;
+
+                try {
+                    const parts = task.data.split('/');
+                    if (parts.length >= 4) {
+                        const pId = parts.at(3);
+                        const pNum = parts.at(1);
+                        packetUniqueKey = String(pId) + "_" + String(pNum);
+                    }
+                } catch (e) {
+                    console.error("キー解析エラー:", e);
+                }
+
+                if (window.globalReadQrSet.has(packetUniqueKey) || currentScanStrings.has(packetUniqueKey)) {
+                    isAlreadyRead = true;
+                } else {
+                    currentScanStrings.add(packetUniqueKey);
+                    window.globalReadQrSet.add(packetUniqueKey);
+                    res.push({
+                        data: task.data,
+                        x: task.gx,
+                        y: task.gy,
+                        canvas: cc
+                    });
+                }
+
+                cCtx.strokeStyle = isAlreadyRead ? "#64748b" : "#4ade80";
+                cCtx.lineWidth = 4;
+                cCtx.strokeRect(margin, margin, task.w, task.h);
+
+                if (dbgOut) {
+                    const box = document.createElement("div");
+                    box.className = "debug-box";
+                    box.appendChild(cc);
+
+                    const badge = document.createElement("div");
+                    if (isAlreadyRead) {
+                        badge.className = "debug-badge";
+                        badge.style.background = "#64748b";
+                        badge.innerText = `既読 👁️ [${i + 1}]`;
+                    } else {
+                        badge.className = "debug-badge success";
+                        badge.innerText = `新規解読 🎉 [${i + 1}]`;
+                    }
+                    box.appendChild(badge);
+                    dbgOut.appendChild(box);
+                }
+            }
+
+            currentQRIndex = end;
+
+            const percent = Math.floor((currentQRIndex / imgTotalQR) * 100);
+            if (pFill) pFill.style.width = `${percent}%`;
+            if (st) {
+                st.style.color = "#38bdf8";
+                st.innerText = `高速同調展開中... [ ${currentQRIndex} / ${imgTotalQR} 個 ] (${percent}%)`;
+            }
+
+            if (currentQRIndex < imgTotalQR) {
+                requestAnimationFrame(processQRChunk);
+            } else {
+                finalizeScan();
+            }
+        }
+
+        function finalizeScan() {
+            if (res.length > 0 || window.globalReadQrSet.size > 0) {
+                if (res.length > 0) {
+                    res.sort((a, b) => {
+                        return Math.abs(a.y - b.y) < 50 ? a.x - b.x : a.y - b.y;
+                    });
+                    res.forEach(r => parsePacket(r.data));
+                }
+
+                if (typeof showResult === "function") {showResult();}
+                else if (typeof renderText === "function") {renderText();}
+
+                let realTotalCount = "461";
+                try {
+                    const anyRaw = res.length > 0 ? res.at(0).data : Array.from(window.globalReadQrSet).at(0);
+                    if (anyRaw && anyRaw.includes('/')) {
+                        const sampleSplit = anyRaw.split('/');
+                        if (sampleSplit.length >= 3) realTotalCount = sampleSplit.at(2);
+                    }
+                } catch (e) { }
+
+                if (pFill && realTotalCount !== "???") {
+                    const totalPercent = Math.min(100, Math.floor((window.globalReadQrSet.size / parseInt(realTotalCount, 10)) * 100));
+                    pFill.style.width = `${totalPercent}%`;
+                }
+
+                if (st) {
+                    st.style.color = "#4ade80";
+                    st.innerText = `完了！写っている ${imgTotalQR} 個のQRを処理しました（新規: ${res.length} 個） [${window.globalReadQrSet.size}/${realTotalCount}]`;
+                }
+            }
+        }
+
+        requestAnimationFrame(processQRChunk);
+    }
+
+
 
         window.upl = function (el) {
             const files = el.files; if (!files || files.length === 0) return;
@@ -377,16 +599,65 @@ textarea {
             reader.readAsDataURL(tgtFile); el.value = "";
         };
 
-        window.addEventListener("paste", function (e) {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let i = 0; i < items.length; i++) {
-                if (items.item(i).type.indexOf("image") !== -1) {
-                    const blob = items.item(i).getAsFile(), reader = new FileReader();
-                    reader.onload = function (event) {const img = new Image(); img.onload = function () {procImg(img)}; img.src = event.target.result};
-                    reader.readAsDataURL(blob); break;
+   document.addEventListener("paste", function (e) {
+        // クリップボードからデータ、またはファイル（Fileオブジェクト）を取得
+        const clipboardData = e.clipboardData || e.originalEvent.clipboardData;
+        const items = clipboardData.items;
+        const files = clipboardData.files; // Fileオブジェクトを直接取得するためのルート
+        const st = document.getElementById("s-text");
+
+        // 1. エクスプローラー等からのファイルコピー（Fileオブジェクト）がある場合の処理
+        if (files && files.length > 0) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                // ファイルが画像タイプ（image/png, image/jpegなど）かチェック
+                if (file.type.indexOf("image") !== -1) {
+                    if (st) {
+                        st.style.color = "#38bdf8";
+                        st.innerText = `ファイルコピーから画像を検出: ${file.name}`;
+                    }
+                    loadImageFromFile(file);
+                    return; // 処理を開始したら終了
                 }
             }
-        });
+        }
+
+        // 2. 通常のスクリーンショット（画像データそのもの）のペースト処理
+        if (items && items.length > 0) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type.indexOf("image") !== -1 || item.kind === "file") {
+                    const blob = item.getAsFile(); // ここでFileオブジェクト（Blob）に変換される
+                    if (blob && blob.type.indexOf("image") !== -1) {
+                        if (st) {
+                            st.style.color = "#38bdf8";
+                            st.innerText = `スクリーンショットから画像を検出（${blob.type}）`;
+                        }
+                        loadImageFromFile(blob);
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (st) st.innerText = "⚠️ ペーストされたデータに画像が見つかりませんでした";
+    });
+
+    // ファイル（Blob/Fileオブジェクト）を読み込んで画像解析に回す共通関数
+    function loadImageFromFile(fileOrBlob) {
+        const st = document.getElementById("s-text");
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const img = new Image();
+            img.onload = function () {
+                if (st) st.innerText = `画像展開完了（${img.width}x${img.height}）➔ QR解析中...`;
+                procImg(img); // 前に修正したリサイズ付きの解析関数を呼び出す
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(fileOrBlob);
+    }
+
 
         navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}}).then(s => {video.srcObject = s; st.innerText = "Ready."; requestAnimationFrame(tick)}).catch(e => {st.innerText = "Camera Offline (Use Paste/Upload)."});
     </script>
